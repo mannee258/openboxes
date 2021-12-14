@@ -12,10 +12,10 @@ package org.pih.warehouse.inventory
 import grails.converters.JSON
 import grails.validation.ValidationException
 import groovy.time.TimeCategory
-import org.grails.plugins.csv.CSVWriter
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.core.Person
 import org.pih.warehouse.core.User
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.order.OrderItem
 import org.pih.warehouse.order.OrderItemStatusCode
 import org.pih.warehouse.product.Product
@@ -95,34 +95,33 @@ class InventoryItemController {
         def commandInstance = inventoryService.getStockCardCommand(cmd, params)
         def quantityMap = inventoryService.getCurrentStockAllLocations(commandInstance?.product, currentLocation, currentUser)
         if (params.download && quantityMap) {
-            def sw = new StringWriter()
-
-            def csv = new CSVWriter(sw, {
-                "Code" { it.code }
-                "Product" { it.product }
-                "Location Group" { it.locationGroup }
-                "Location" { it.location }
-                "Quantity on Hand" { it.qtyOnHand }
-                "Total Value" { it.totalValue }
-            })
+            def csv = CSVUtils.getCSVPrinter()
+            csv.printRecord(
+                    "Code",
+                    "Product",
+                    "Location Group",
+                    "Location",
+                    "Quantity on Hand",
+                    "Total Value"
+            )
 
             quantityMap.each {
                 it.each { key, values ->
                     values.locations.each { value ->
-                        csv << [
-                                code         : commandInstance?.product?.productCode,
-                                product      : commandInstance?.product?.name,
-                                locationGroup: key ?: g.message(code: 'locationGroup.empty.label'),
-                                location     : value?.location?.name,
-                                qtyOnHand    : value.quantity,
-                                totalValue   : value.value,
-                        ]
+                        csv.printRecord(
+                                commandInstance?.product?.productCode,
+                                commandInstance?.product?.name,
+                                key ?: g.message(code: 'locationGroup.empty.label'),
+                                value?.location?.name,
+                                CSVUtils.formatInteger(value.quantity),
+                                value.value,
+                        )
                     }
                 }
             }
 
             response.setHeader("Content-disposition", "attachment; filename=\"All-Locations-${commandInstance?.product?.productCode}.csv\"")
-            render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
+            render(contentType: "text/csv", text: csv.out.toString())
             return
         } else {
             def targetUri = "/inventoryItem/showStockCard/${commandInstance?.product?.id}"

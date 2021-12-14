@@ -9,9 +9,11 @@
  * */
 package org.pih.warehouse.requisition
 
+import org.apache.commons.csv.CSVFormat
+import org.apache.commons.csv.CSVPrinter
 import org.apache.commons.lang.StringEscapeUtils
-import org.grails.plugins.csv.CSVWriter
 import org.pih.warehouse.core.Location
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.product.Product
 
 class RequisitionTemplateController {
@@ -80,10 +82,10 @@ class RequisitionTemplateController {
                 ]
             }
 
-            def sw = new StringWriter()
+            def sw = new StringWriter()  // FIXME refactor this to use CSVPrinter
 
             try {
-                if (requisitionItems) {
+                if (requisitionItems) {  // FIXME
                     sw.append(g.message(code: 'product.code.label')).append(",")
                     sw.append(g.message(code: 'product.description.label')).append(",")
                     sw.append(g.message(code: 'product.primaryCategory.label')).append(",")
@@ -402,35 +404,36 @@ class RequisitionTemplateController {
             def date = new Date()
             def sw = new StringWriter()
 
-            def csv = new CSVWriter(sw, {
-                "Product Code" { it.productCode }
-                "Product Name" { it.productName }
-                "Quantity" { it.quantity }
-                "UOM" { it.unitOfMeasure }
-                hasRoleFinance ? "Unit cost" { it.unitCost } : null
-                hasRoleFinance ? "Total cost" { it.totalCost } : null
-            })
+            def csv = CSVUtils.getCSVPrinter()
+            csv.printRecord(
+                    "Product Code",
+                    "Product Name",
+                    "Quantity",
+                    "UOM",
+                    "Unit cost",
+                    "Total cost",
+            )
 
             if (requisition.requisitionItems) {
                 RequisitionItemSortByCode sortByCode = requisition.sortByCode ?: RequisitionItemSortByCode.SORT_INDEX
 
                 requisition."${sortByCode.methodName}".each { requisitionItem ->
-                    csv << [
-                            productCode  : requisitionItem.product.productCode,
-                            productName  : StringEscapeUtils.escapeCsv(requisitionItem.product.name),
-                            quantity     : requisitionItem.quantity,
-                            unitOfMeasure: "EA/1",
-                            unitCost     : hasRoleFinance ? formatNumber(number: requisitionItem.product.pricePerUnit ?: 0, format: '###,###,##0.00##') : null,
-                            totalCost    : hasRoleFinance ? formatNumber(number: requisitionItem.totalCost ?: 0, format: '###,###,##0.00##') : null
-                    ]
+                    csv.printRecord(
+                            requisitionItem.product.productCode,
+                            requisitionItem.product.name,
+                            requisitionItem.quantity,
+                            "EA/1",  // FIXME should this ...
+                            hasRoleFinance ? CSVUtils.formatCurrency(number: requisitionItem.product.pricePerUnit ?: 0, isUnitPrice: true) : null,
+                            hasRoleFinance ? CSVUtils.formatCurrency(number: requisitionItem.totalCost ?: 0) : null
+                    )
                 }
             } else {
-                csv << [productCode: "", productName: "", quantity: "", unitOfMeasure: "", unitCost: "", totalCost: ""]
+                csv.printRecord(null, null, null, null, null, null)
             }
 
             response.contentType = "text/csv"
             response.setHeader("Content-disposition", "attachment; filename=\"Stock List - ${requisition?.destination?.name} - ${date.format("yyyyMMdd-hhmmss")}.csv\"")
-            render(contentType: "text/csv", text: csv.writer.toString())
+            render(contentType: "text/csv", text: csv.out.toString())
             return
         } else {
             render(text: 'No requisition found', status: 404)

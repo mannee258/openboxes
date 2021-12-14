@@ -10,8 +10,10 @@
 package org.pih.warehouse.api
 
 import grails.converters.JSON
+import javax.xml.bind.ValidationException
 import org.codehaus.groovy.grails.web.json.JSONObject
 import org.pih.warehouse.core.Location
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.importer.ImportDataCommand
 import org.pih.warehouse.order.Order
 import org.pih.warehouse.order.OrderItem
@@ -19,9 +21,6 @@ import org.pih.warehouse.order.OrderItemStatusCode
 import org.pih.warehouse.product.Product
 import org.pih.warehouse.shipping.Shipment
 import org.pih.warehouse.shipping.ShipmentItem
-import javax.xml.bind.ValidationException
-import org.grails.plugins.csv.CSVWriter
-import org.apache.commons.lang.StringEscapeUtils
 
 class CombinedShipmentItemApiController {
 
@@ -145,53 +144,49 @@ class CombinedShipmentItemApiController {
     }
 
     def exportTemplate = {
-        def sw = new StringWriter()
-
-        def csv = new CSVWriter(sw, {
-            "Order number" { it.orderNumber }
-            "Order Item id" { it.id }
-            "Product code" { it.productCode }
-            "Product name" { it.productName }
-            "Lot number" { it.lotNumber }
-            "Expiry" { it.expiry }
-            "Quantity to ship" { it.quantityToShip }
-            "UOM" { it.unitOfMeasure }
-            "Pack level 1" { it.palletName }
-            "Pack level 2" { it.boxName }
-            "Recipient" { it.recipient }
-            "Budget code" { it.budgetCode }
-        })
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+                "Order number",
+                "Order Item id",
+                "Product code",
+                "Product name",
+                "Lot number",
+                "Expiry",
+                "Quantity to ship",
+                "UOM",
+                "Pack level 1",  // pallet name
+                "Pack level 2",  // box name
+                "Recipient",
+                "Budget code"
+        )
 
         if (params.blank) {
-            csv << [orderNumber: "", id: "", productCode: "", productName: "", lotNumber: "", expiry: "", quantityToShip: "", unitOfMeasure: "", palletName: "", boxName: "", recipient: "", budgetCode: ""]
+            csv.printRecord(null, null, null, null, null, null, null, null, null, null, null, null)
         } else {
             def vendor = Location.get(params.vendor)
             def destination = Location.get(params.destination)
             def orders = orderService.getOrdersForCombinedShipment(vendor, destination)
             def orderItems = OrderItem.findAllByOrderInList(orders)
-            orderItems.findAll{ it.orderItemStatusCode != OrderItemStatusCode.CANCELED && it.getQuantityRemainingToShip() > 0 }.each {orderItem ->
-                String quantityUom = "${orderItem?.quantityUom?.code?:g.message(code:'default.ea.label')?.toUpperCase()}"
-                String quantityPerUom = "${g.formatNumber(number: orderItem?.quantityPerUom?:1, maxFractionDigits: 0)}"
-                String unitOfMeasure = "${quantityUom}/${quantityPerUom}"
-                csv << [
-                        orderNumber         : orderItem.order.orderNumber,
-                        id                  : orderItem.id,
-                        productCode         : orderItem.product.productCode,
-                        productName         : orderItem.product.name,
-                        lotNumber           : '',
-                        expiry              : '',
-                        quantityToShip      : orderItem.getQuantityRemainingToShip(),
-                        unitOfMeasure       : unitOfMeasure,
-                        palletName          : '',
-                        boxName             : '',
-                        recipient           : orderItem.recipient ?: '',
-                        budgetCode          : StringEscapeUtils.escapeCsv(orderItem.budgetCode?.code) ?: '',
-                ]
+            orderItems.findAll { it.orderItemStatusCode != OrderItemStatusCode.CANCELED && it.getQuantityRemainingToShip() > 0 }.each { orderItem ->
+                csv.printRecord(
+                        orderItem?.order?.orderNumber,
+                        orderItem?.id,
+                        orderItem?.product?.productCode,
+                        orderItem?.product?.name,
+                        null,  // Lot number
+                        null,  // Expiry
+                        orderItem?.getQuantityRemainingToShip(),
+                        CSVUtils.formatUnitOfMeasure(orderItem?.quantityUom?.code, orderItem?.quantityPerUom),
+                        null,  // Pack level 1
+                        null,  // Pack level 2
+                        orderItem?.recipient,
+                        orderItem?.budgetCode?.code,
+                )
             }
         }
 
         response.setHeader("Content-disposition", "attachment; filename=\"Order-items-template.csv\"")
-        render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
+        render(contentType: "text/csv", text: csv.out.toString())
         return
     }
 }

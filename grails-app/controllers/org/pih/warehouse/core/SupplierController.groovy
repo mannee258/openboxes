@@ -10,7 +10,7 @@
 package org.pih.warehouse.core
 
 import grails.converters.JSON
-import org.grails.plugins.csv.CSVWriter
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.product.Product
 
 class SupplierController {
@@ -41,38 +41,40 @@ class SupplierController {
         def data = orderService.getOrderItemsForPriceHistory(supplier, product, params.q)
 
         if (params.format == "text/csv") {
-            def sw = new StringWriter()
-
-            def csv = new CSVWriter(sw, {
-                "Order Number" { it.orderNumber }
-                "Date Created" { it.dateCreated }
-                "Description" { it.description }
-                "Product Code" { it.productCode }
-                "Product" { it.productName }
-                "Source Code" { it.sourceCode }
-                "Supplier Code" { it.supplierCode }
-                "Manufacturer" { it.manufacturerName }
-                "Manufacturer Code" { it.manufacturerCode }
-                "Unit Price" { it.unitPrice }
-            })
+            def csv = CSVUtils.getCSVPrinter()
+            csv.printRecord(
+                "Order Number",
+                "Date Created",
+                "Description",
+                "Product Code",
+                "Product",
+                "Source Code",
+                "Supplier Code",
+                "Manufacturer",
+                "Manufacturer Code",
+                "Unit Price"
+            )
 
             data.each {
-                csv << [
-                        orderNumber           : it.orderNumber,
-                        dateCreated           : it.dateCreated.format("MM/dd/yyyy"),
-                        description           : it.description,
-                        productCode           : it.productCode,
-                        productName           : it.productName,
-                        sourceCode            : it.sourceCode ?: '',
-                        supplierCode          : it.supplierCode ?: '',
-                        manufacturerName      : it.manufacturerName ?: '',
-                        manufacturerCode      : it.manufacturerCode ?: '',
-                        unitPrice             : it.unitPrice ? it.unitPrice/it.quantityPerUom : '',
-                ]
+                csv.printRecord(
+                        it?.orderNumber,
+                        it?.dateCreated.format("MM/dd/yyyy"),
+                        it?.description,
+                        it?.productCode,
+                        it?.productName,
+                        it?.sourceCode,
+                        it?.supplierCode,
+                        it?.manufacturerName,
+                        it?.manufacturerCode,
+                        it?.unitPrice ? CSVUtils.formatCurrency(
+                                number: (it?.unitPrice ?: 0) / (it?.quantityPerUom ?: 1),
+                                currencyCode: it?.currencyCode,
+                                isUnitPrice: true) : ''
+                )
             }
 
             response.setHeader("Content-disposition", "attachment; filename=\"Price-History.csv\"")
-            render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
+            render(contentType: "text/csv", text: csv.out.toString())
             return
         }
 

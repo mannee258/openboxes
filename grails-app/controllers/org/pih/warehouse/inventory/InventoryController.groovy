@@ -676,7 +676,7 @@ class InventoryController {
         return getCsvForInventoryMap(map, [:])
     }
 
-    def getCsvForInventoryMap(map, statusMap) {
+    def getCsvForInventoryMap(map, statusMap) {  // FIXME!
         def csv = ""
         csv += '"' + "${warehouse.message(code: 'inventoryLevel.status.label')}" + '"' + ","
         csv += '"' + "${warehouse.message(code: 'product.productCode.label')}" + '"' + ","
@@ -729,7 +729,7 @@ class InventoryController {
         return csv
     }
 
-    def getCsvForProductMap(inventoryItems) {
+    def getCsvForProductMap(inventoryItems) {  // FIXME!!
         def hasRoleFinance = userService.hasRoleFinance(session.user)
 
         def csv = ""

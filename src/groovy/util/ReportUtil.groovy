@@ -12,7 +12,7 @@ class ReportUtil {
      * @param list
      * @return
      */
-    static getCsv(list) {
+    static getCsv(list) {  // FIXME
 
         def csv = ""
 
@@ -42,7 +42,7 @@ class ReportUtil {
     }
 
 
-    static getCsvForListOfMapEntries(List list) {
+    static getCsvForListOfMapEntries(List list) {  // FIXME
         StringBuffer sb = new StringBuffer()
         if (list) {
             list[0].eachWithIndex { k, v, index ->

@@ -9,10 +9,8 @@
  **/
 package org.pih.warehouse.core
 
-import org.pih.warehouse.inventory.InventoryItem
-import org.pih.warehouse.product.Product
+import org.pih.warehouse.importer.CSVUtils
 import org.springframework.transaction.TransactionStatus
-import org.grails.plugins.csv.CSVWriter
 
 class OrganizationController {
 
@@ -28,27 +26,26 @@ class OrganizationController {
     def download = {
         params.max = null
         def organizationInstanceList = organizationService.getOrganizations(params)
-        def sw = new StringWriter()
-        def csv = new CSVWriter(sw, {
-            "Id" { it.id }
-            "Code" { it.code }
-            "Name" { it.name }
-            "Default location" { it.defaultLocation }
-            "Roles" { it.roles }
-        })
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+                "Id",
+                "Code",
+                "Name",
+                "Default location",
+                "Roles"
+        )
 
         organizationInstanceList.each { organization ->
-            csv << [
-                    id              : organization.id,
-                    code            : organization.code,
-                    name            : organization.name,
-                    defaultLocation : organization.defaultLocation ?: '',
-                    roles           : organization.roles.join(","),
-            ]
+            csv.printRecord(
+                    organization?.id,
+                    organization?.code,
+                    organization?.name,
+                    organization?.defaultLocation,
+                    organization?.roles?.join(","),
+            )
         }
         response.setHeader("Content-disposition", "attachment; filename=\"Organizations-${new Date().format("MM/dd/yyyy")}.csv\"")
-        render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
-
+        render(contentType: "text/csv", text: csv.out.toString())
     }
 
 

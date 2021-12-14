@@ -10,20 +10,18 @@
 package org.pih.warehouse.data
 
 import groovy.sql.Sql
-import org.apache.commons.lang.StringEscapeUtils
-import org.grails.plugins.csv.CSVWriter
 import org.grails.plugins.excelimport.ExcelImportUtils
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.core.ProductPrice
 import org.pih.warehouse.core.UnitOfMeasure
 import org.pih.warehouse.core.UnitOfMeasureClass
 import org.pih.warehouse.core.UnitOfMeasureType
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.importer.ImportDataCommand
 import org.pih.warehouse.importer.InventoryLevelExcelImporter
 import org.pih.warehouse.inventory.Inventory
 import org.pih.warehouse.inventory.InventoryLevel
 import org.pih.warehouse.inventory.InventoryStatus
-import org.pih.warehouse.product.Category
 import org.pih.warehouse.product.Product
 import org.pih.warehouse.product.ProductPackage
 
@@ -479,40 +477,40 @@ class DataService {
     }
 
     String exportInventoryLevels(Collection inventoryLevels) {
-        def sw = new StringWriter()
-        def csv = new CSVWriter(sw, {
-            "Product Code" { it.productCode }
-            "Product Name" { it.productName }
-            "Inventory" { it.inventory }
-            "Status" { it.status }
-            "Bin Location" { it.binLocation }
-            "Preferred" { it.preferred }
-            "ABC Class" { it.abcClass }
-            "Min Quantity" { it.minQuantity }
-            "Reorder Quantity" { it.reorderQuantity }
-            "Max Quantity" { it.maxQuantity }
-            "Forecast Quantity" { it.forecastQuantity }
-            "Forecast Period" { it.forecastPeriodDays }
-            "UOM" { it.unitOfMeasure }
-        })
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+                "Product Code",
+                "Product Name",
+                "Inventory",
+                "Status",
+                "Bin Location",
+                "Preferred",
+                "ABC Class",
+                "Min Quantity",
+                "Reorder Quantity",
+                "Max Quantity",
+                "Forecast Quantity",
+                "Forecast Period",
+                "UOM"
+        )
         inventoryLevels.each { inventoryLevel ->
-            csv << [
-                    productCode       : inventoryLevel.product.productCode,
-                    productName       : inventoryLevel.product.name,
-                    inventory         : inventoryLevel.inventory.warehouse.name,
-                    status            : inventoryLevel.status,
-                    binLocation       : inventoryLevel.binLocation ?: "",
-                    preferred         : inventoryLevel.preferred ?: "",
-                    abcClass          : inventoryLevel.abcClass ?: "",
-                    minQuantity       : inventoryLevel.minQuantity ?: "",
-                    reorderQuantity   : inventoryLevel.reorderQuantity ?: "",
-                    maxQuantity       : inventoryLevel.maxQuantity ?: "",
-                    forecastQuantity  : inventoryLevel.forecastQuantity ?: "",
-                    forecastPeriodDays: inventoryLevel.forecastPeriodDays ?: "",
-                    unitOfMeasure     : inventoryLevel?.product?.unitOfMeasure ?: "EA"
-            ]
+            csv.printRecord(
+                    inventoryLevel?.product?.productCode,
+                    inventoryLevel?.product?.name,
+                    inventoryLevel?.inventory?.warehouse?.name,
+                    inventoryLevel?.status,
+                    inventoryLevel?.binLocation,
+                    inventoryLevel?.preferred,
+                    inventoryLevel?.abcClass,
+                    inventoryLevel?.minQuantity,
+                    inventoryLevel?.reorderQuantity,
+                    inventoryLevel?.maxQuantity,
+                    inventoryLevel?.forecastQuantity,
+                    inventoryLevel?.forecastPeriodDays,
+                    inventoryLevel?.product?.unitOfMeasure ?: "EA"  // FIXME
+            )
         }
-        return csv.writer.toString()
+        return csv.out.toString()
     }
 
 
@@ -524,138 +522,136 @@ class DataService {
      */
     String exportRequisitions(requisitions) {
         def formatDate = new SimpleDateFormat("dd/MMM/yyyy hh:mm:ss")
-        def sw = new StringWriter()
 
-        def csvWriter = new CSVWriter(sw, {
-            "Requisition Number" { it.requisitionNumber }
-            "Status" { it.status }
-            "Type" { it.type }
-            "Class" { it.commodityClass }
-            "Name" { it.name }
-            "Origin" { it.origin }
-            "Destination" { it.destination }
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+                "Requisition Number",
+                "Status",
+                "Type",
+                "Class",
+                "Name",
+                "Origin",
+                "Destination",
 
-            "Requested by" { it?.requestedBy?.name ?: "" }
-            "Date Requested" { it.dateRequested }
+                "Requested by",
+                "Date Requested",
 
-            "Verified" { it?.verifiedBy?.name ?: "" }
-            "Date Verified" { it.dateVerified }
+                "Verified",
+                "Date Verified",
 
-            "Picked" { it?.pickedBy?.name ?: "" }
-            "Date Picked" { it.datePicked }
+                "Picked",
+                "Date Picked",
 
-            "Checked" { it?.checkedBy?.name ?: "" }
-            "Date Checked" { it.dateChecked }
+                "Checked",
+                "Date Checked",
 
-            "Issued" { it?.issuedBy?.name ?: "" }
-            "Date Issued" { it.dateIssued }
+                "Issued",
+                "Date Issued",
 
-            "Created" { it?.createdBy?.name ?: "" }
-            "Date Created" { it.dateCreated }
+                "Created",
+                "Date Created",
 
-            "Updated" { it?.updatedBy?.name ?: "" }
-            "Date Updated" { it.lastUpdated }
-        })
+                "Updated",
+                "Date Updated",
+        )
 
-        requisitions.each { requisition ->
-            def row = [
-                    requisitionNumber: requisition.requestNumber,
-                    type             : requisition?.type,
-                    commodityClass   : requisition?.commodityClass,
-                    status           : requisition.status,
-                    name             : requisition.name,
-                    origin           : requisition.origin,
-                    destination      : requisition.destination,
+        requisitions.each {
+            requisition ->
+                csv.printRecord(
+                        requisition?.requestNumber,
+                        requisition?.status,
+                        requisition?.type,
+                        requisition?.commodityClass,
+                        requisition?.name,
+                        requisition?.origin,
+                        requisition?.destination,
 
-                    requestedBy      : requisition.requestedBy,
-                    dateRequested    : requisition.dateRequested ? "${formatDate.format(requisition.dateRequested)}" : "",
+                        requisition?.requestedBy,
+                        requisition?.dateRequested ? "${formatDate.format(requisition.dateRequested)}" : "",
 
-                    reviewedBy       : requisition.reviewedBy,
-                    dateReviewed     : requisition.dateReviewed ? "${formatDate.format(requisition.dateReviewed)}" : "",
+                        // requisition?.reviewedBy,
+                        // requisition?.dateReviewed ? "${formatDate.format(requisition.dateReviewed)}" : "",
 
-                    verifiedBy       : requisition.verifiedBy,
-                    dateVerified     : requisition.dateVerified ? "${formatDate.format(requisition.dateVerified)}" : "",
+                        requisition?.verifiedBy,
+                        requisition?.dateVerified ? "${formatDate.format(requisition.dateVerified)}" : "",
 
-                    checkedBy        : requisition.checkedBy,
-                    dateChecked      : requisition.dateChecked ? "${formatDate.format(requisition.dateChecked)}" : "",
+                        requisition?.picklist?.picker,
+                        requisition?.picklist?.datePicked ? "${formatDate.format(requisition.picklist.datePicked)}" : "",
 
-                    deliveredBy      : requisition.deliveredBy,
-                    dateDelivered    : requisition.dateDelivered ? "${formatDate.format(requisition.dateDelivered)}" : "",
+                        requisition?.checkedBy,
+                        requisition?.dateChecked ? "${formatDate.format(requisition.dateChecked)}" : "",
 
-                    pickedBy         : requisition?.picklist?.picker,
-                    datePicked       : requisition?.picklist?.datePicked ? "${formatDate.format(requisition?.picklist?.datePicked)}" : "",
+                        // requisition?.deliveredBy,
+                        // requisition?.dateDelivered ? "${formatDate.format(requisition.dateDelivered)}" : "",
 
-                    issuedBy         : requisition.issuedBy,
-                    dateIssued       : requisition.dateIssued ? "${formatDate.format(requisition.dateIssued)}" : "",
+                        requisition?.issuedBy,
+                        requisition?.dateIssued ? "${formatDate.format(requisition.dateIssued)}" : "",
 
-                    receivedBy       : requisition.receivedBy,
-                    dateReceived     : requisition.dateReceived ? "${formatDate.format(requisition.dateReceived)}" : "",
+                        // requisition?.receivedBy,
+                        // requisition?.dateReceived ? "${formatDate.format(requisition.dateReceived)}" : "",
 
-                    createdBy        : requisition.createdBy,
-                    dateCreated      : requisition.dateCreated ? "${formatDate.format(requisition.dateCreated)}" : "",
+                        requisition?.createdBy,
+                        requisition?.dateCreated ? "${formatDate.format(requisition.dateCreated)}" : "",
 
-                    updatedBy        : requisition.updatedBy,
-                    lastUpdated      : requisition.lastUpdated ? "${formatDate.format(requisition.lastUpdated)}" : "",
-            ]
-            csvWriter << row
+                        requisition?.updatedBy,
+                        requisition?.lastUpdated ? "${formatDate.format(requisition.lastUpdated)}" : "",
+                )
         }
-        return sw.toString()
+        return csv.out.toString()
     }
 
     String exportRequisitionItems(requisitions) {
         def formatDate = new SimpleDateFormat("dd/MMM/yyyy hh:mm:ss")
-        def sw = new StringWriter()
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+                "Requisition Number",
+                "Status",
+                "Type",
+                "Class",
+                "Name",
+                "Origin",
+                "Destination",
+                "Requested by",
+                "Date Requested",
 
-        def csvWriter = new CSVWriter(sw, {
-            "Requisition Number" { it.requisitionNumber }
-            "Status" { it.status }
-            "Type" { it.type }
-            "Class" { it.commodityClass }
-            "Name" { it.name }
-            "Origin" { it.origin }
-            "Destination" { it.destination }
-            "Requested by" { it?.requestedBy?.name }
-            "Date Requested" { it.dateRequested }
-            "Product code" { it.productCode }
-            "Product name" { it.productName }
-            "Status" { it.itemStatus ?: "" }
-            "Requested" { it.quantity ?: "" }
-            "Approved" { it.quantityApproved ?: "" }
-            "Picked" { it.quantityPicked ?: "" }
-            "Canceled" { it.quantityCanceled ?: "" }
-            "Reason Code" { it.reasonCode ?: "" }
-            "Comments" { it.comments ?: "" }
+                "Product code",
+                "Product name",
+                "Status",
+                "Requested",  // requested quantity
+                "Approved",  // quantity approved
+                "Picked",
+                "Canceled",
+                "Reason Code",
+                "Comments"
 
-        })
+        )
 
         requisitions.each { requisition ->
             requisition.requisitionItems.each { requisitionItem ->
-                def row = [
-                        requisitionNumber: requisition.requestNumber,
-                        type             : requisition?.type,
-                        commodityClass   : requisition?.commodityClass,
-                        status           : requisition.status,
-                        name             : requisition.name,
-                        requestedBy      : requisition.requestedBy ?: "",
-                        dateRequested    : requisition.dateRequested ? "${formatDate.format(requisition.dateRequested)}" : "",
-                        origin           : requisition.origin,
-                        destination      : requisition.destination,
-                        productCode      : requisitionItem.product.productCode,
-                        productName      : requisitionItem.product.name,
-                        itemStatus       : requisitionItem.status,
-                        quantity         : requisitionItem.quantity,
-                        quantityCanceled : requisitionItem.quantityCanceled,
-                        quantityApproved : requisitionItem.quantityApproved,
-                        quantityPicked   : requisitionItem.calculateQuantityPicked(),
-                        reasonCode       : requisitionItem.cancelReasonCode,
-                        comments         : requisitionItem.cancelComments,
+                csv.printRecord(
+                        requisition?.requestNumber,
+                        requisition?.status,
+                        requisition?.type,
+                        requisition?.commodityClass,
+                        requisition?.name,
+                        requisition?.origin,
+                        requisition?.destination,
+                        requisition?.requestedBy,
+                        requisition?.dateRequested ? "${formatDate.format(requisition.dateRequested)}" : "",
 
-
-                ]
-                csvWriter << row
+                        requisitionItem?.product?.productCode,
+                        requisitionItem?.product?.name,
+                        requisitionItem?.status,
+                        requisitionItem?.quantity,
+                        requisitionItem?.quantityApproved,
+                        requisitionItem?.calculateQuantityPicked(),
+                        requisitionItem?.quantityCanceled,
+                        requisitionItem?.cancelReasonCode,
+                        requisitionItem?.cancelComments
+                )
             }
         }
-        return sw.toString()
+        return csv.out.toString()
     }
 
     def transformObjects(List objects, List includeFields) {
@@ -701,23 +697,14 @@ class DataService {
      * @return
      */
     String generateCsv(csvrows) {
-        def sw = new StringWriter()
+        def csv = CSVUtils.getCSVPrinter()
         if (csvrows) {
-            def columnHeaders = csvrows[0].keySet().collect { value -> StringEscapeUtils.escapeCsv(value) }
-            sw.append(columnHeaders.join(",")).append("\n")
+            csv.printRecord(csvrows[0].keySet())
             csvrows.each { row ->
-                def values = row.values().collect { value ->
-                    if (value?.toString()?.isNumber()) {
-                        value
-                    } else {
-                        StringEscapeUtils.escapeCsv(value.toString())
-                    }
-                }
-                sw.append(values.join(","))
-                sw.append("\n")
+                csv.printRecord(row.values())
             }
         }
-        return sw.toString()
+        return csv.out.toString()
     }
 
 }

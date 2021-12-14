@@ -239,7 +239,7 @@ class DashboardController {
              "Available Qty"  : it.currentQuantity]
         }
 
-        def sw = new StringWriter()
+        def sw = new StringWriter()  // FIXME
         if (data) {
             def columns = data[0].keySet().collect { value -> StringEscapeUtils.escapeCsv(value) }
             sw.append(columns.join(",")).append("\n")
@@ -262,7 +262,7 @@ class DashboardController {
         return
     }
 
-    def downloadFastMoversAsCsv = {
+    def downloadFastMoversAsCsv = {  // FIXME
         println "exportFastMoversAsCsv: " + params
         def location = Location.get(params?.location?.id ?: session?.warehouse?.id)
 

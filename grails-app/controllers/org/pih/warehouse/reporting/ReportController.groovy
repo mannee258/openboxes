@@ -11,19 +11,17 @@ package org.pih.warehouse.reporting
 
 import grails.converters.JSON
 import grails.plugin.springcache.annotations.CacheFlush
-import groovy.sql.Sql
 import org.apache.commons.lang.StringEscapeUtils
-import org.grails.plugins.csv.CSVWriter
 import org.pih.warehouse.api.StockMovement
 import org.pih.warehouse.api.StockMovementItem
 import org.pih.warehouse.core.Location
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.inventory.Transaction
 import org.pih.warehouse.order.OrderItem
 import org.pih.warehouse.product.Product
 import org.pih.warehouse.report.ChecklistReportCommand
 import org.pih.warehouse.report.InventoryReportCommand
 import org.pih.warehouse.report.MultiLocationInventoryReportCommand
-
 import org.quartz.JobKey
 import org.quartz.impl.StdScheduler
 import util.ReportUtil
@@ -98,7 +96,7 @@ class ReportController {
         render([responseTime: responseTime] as JSON)
     }
 
-    def binLocationCsvHeader = { binLocation ->
+    def binLocationCsvHeader = { binLocation ->  // FIXME
         String csv = ""
         if (binLocation) {
             csv += g.message(code: 'default.status.label') + ","
@@ -121,7 +119,7 @@ class ReportController {
 
     }
 
-    def binLocationCsvRow = { binLocation ->
+    def binLocationCsvRow = { binLocation -> // FIXME
         String csv = ""
         if (binLocation) {
             String defaultBinLocation = g.message(code: 'default.label')
@@ -228,7 +226,7 @@ class ReportController {
 
                 println inventoryItems
                 //sw.append(csvrows[0].keySet().join(",")).append("\n")
-                sw.append("Product Code").append(",")
+                sw.append("Product Code").append(",")  // FIXME
                 sw.append("Product").append(",")
                 sw.append("Lot number").append(",")
                 sw.append("Expiration date").append(",")
@@ -458,74 +456,84 @@ class ReportController {
     }
 
     def showOnOrderReport = {
+        def csv = CSVUtils.getCSVPrinter()
+
         if (params.downloadAction == "downloadOnOrderReport") {
             def location = Location.get(session.warehouse.id)
             def items = orderService.getPendingInboundOrderItems(location)
             items += shipmentService.getPendingInboundShipmentItems(location)
 
             if (items) {
+                csv.printRecord(
+                        "Code",
+                        "Product",
+                        "Quantity Ordered Not Shipped",
+                        "Quantity Shipped Not Received",
+                        "PO Number",
+                        "PO Description",
+                        "Supplier Organization",
+                        "Supplier Location",
+                        "Supplier Location Group",
+                        "Estimated Goods Ready Date",
+                        "Shipment Number",
+                        "Ship Date",
+                        "Shipment Type"
+                )
 
-                def sw = new StringWriter()
-                def csv = new CSVWriter(sw, {
-                    "Code" { it.productCode }
-                    "Product" { it.productName }
-                    "Quantity Ordered Not Shipped" { it.qtyOrderedNotShipped }
-                    "Quantity Shipped Not Received" { it.qtyShippedNotReceived }
-                    "PO Number" { it.orderNumber }
-                    "PO Description" { it.orderDescription }
-                    "Supplier Organization" { it.supplierOrganization }
-                    "Supplier Location" { it.supplierLocation }
-                    "Supplier Location Group" { it.supplierLocationGroup }
-                    "Estimated Goods Ready Date" { it.estimatedGoodsReadyDate }
-                    "Shipment Number" { it.shipmentNumber }
-                    "Ship Date" { it.shipDate }
-                    "Shipment Type" { it.shipmentType }
-                })
-
-                items.sort { a,b ->
+                items.sort { a, b ->
                     a.product.productCode <=> b.product.productCode
                 }.each {
                     def isOrderItem = it instanceof OrderItem
-                    csv << [
-                            productCode  : it.product.productCode,
-                            productName  : it.product.name,
-                            qtyOrderedNotShipped : isOrderItem ? it.quantityRemaining * it.quantityPerUom : '',
-                            qtyShippedNotReceived : isOrderItem ? '' : it.quantityRemaining,
-                            orderNumber  : isOrderItem ? it.order.orderNumber : (it.shipment.isFromPurchaseOrder ? it.orderNumber : ''),
-                            orderDescription  : isOrderItem ? it.order.name : (it.shipment.isFromPurchaseOrder ? it.orderName : ''),
-                            supplierOrganization  : isOrderItem ? it.order?.origin?.organization?.name : it.shipment?.origin?.organization?.name,
-                            supplierLocation  : isOrderItem ? it.order.origin.name : it.shipment.origin.name,
-                            supplierLocationGroup  : isOrderItem ? it.order?.origin?.locationGroup?.name : it.shipment?.origin?.locationGroup?.name,
-                            estimatedGoodsReadyDate  : isOrderItem ? it.actualReadyDate?.format("MM/dd/yyyy") : '',
-                            shipmentNumber  : isOrderItem ? '' : it.shipment.shipmentNumber,
-                            shipDate  : isOrderItem ? '' : it.shipment.expectedShippingDate?.format("MM/dd/yyyy"),
-                            shipmentType  : isOrderItem ? '' : it.shipment.shipmentType.name
-                    ]
+                    csv.printRecord(
+                            it?.product.productCode,
+                            it?.product.name,
+                            isOrderItem ? it?.quantityRemaining * it?.quantityPerUom : '',
+                            isOrderItem ? '' : it?.quantityRemaining,
+                            isOrderItem ? it?.order?.orderNumber : (it?.shipment?.isFromPurchaseOrder ? it?.orderNumber : ''),
+                            isOrderItem ? it?.order?.name : (it.shipment.isFromPurchaseOrder ? it.orderName : ''),
+                            isOrderItem ? it?.order?.origin?.organization?.name : it.shipment?.origin?.organization?.name,
+                            isOrderItem ? it?.order?.origin?.name : it?.shipment?.origin?.name,
+                            isOrderItem ? it?.order?.origin?.locationGroup?.name : it.shipment?.origin?.locationGroup?.name,
+                            isOrderItem ? it?.actualReadyDate?.format("MM/dd/yyyy") : '',
+                            isOrderItem ? '' : it?.shipment?.shipmentNumber,
+                            isOrderItem ? '' : it?.shipment?.expectedShippingDate?.format("MM/dd/yyyy"),
+                            isOrderItem ? '' : it?.shipment?.shipmentType?.name
+                    )
                 }
 
                 response.setHeader("Content-disposition", "attachment; filename=\"Detailed-Order-Report-${new Date().format("MM/dd/yyyy")}.csv\"")
-                render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
+                render(contentType: "text/csv", text: csv.out.toString())
             }
         } else if(params.downloadAction == "downloadSummaryOnOrderReport") {
             def location = Location.get(session.warehouse.id)
             def data = reportService.getOnOrderSummary(location)
             if (data) {
 
-                def sw = new StringWriter()
-                def csv = new CSVWriter(sw, {
-                    "Code" { it.productCode }
-                    "Product" { it.productName }
-                    "Quantity Ordered Not Shipped" { it.qtyOrderedNotShipped }
-                    "Quantity Shipped Not Received" { it.qtyShippedNotReceived }
-                    "Total On Order" { it.totalOnOrder }
-                    "Total On Hand" { it.totalOnHand }
-                    "Total On Hand and On Order" { it.totalOnHandAndOnOrder }
-                })
+                csv.printRecord(
+                        "Code",
+                        "Product",
+                        "Quantity Ordered Not Shipped",
+                        "Quantity Shipped Not Received",
+                        "Total On Order",
+                        "Total On Hand",
+                        "Total On Hand and On Order",
+                )
 
-                data = data.sort { it.productCode }
-                csv.writeAll(data)
+                data.sort {
+                    it.productCode
+                }.each {
+                    csv.printRecord(
+                            it.productCode,
+                            it.productName,
+                            it.qtyOrderedNotShipped,
+                            it.qtyShippedNotReceived,
+                            it.totalOnOrder,
+                            it.totalOnHand,
+                            it.totalOnHandAndOnOrder
+                    )
+                }
                 response.setHeader("Content-disposition", "attachment; filename=\"Detailed-Order-Report-${new Date().format("MM/dd/yyyy")}.csv\"")
-                render(contentType: "text/csv", text: sw.toString(), encoding: "UTF-8")
+                render(contentType: "text/csv", text: csv.out.toString())
             }
         }
     }
@@ -538,7 +546,7 @@ class ReportController {
 
             try {
                 if (command.entries) {
-                    sw.append("Code").append(",")
+                    sw.append("Code").append(",")  // FIXME
                     sw.append("Product").append(",")
                     sw.append("Category").append(",")
                     sw.append("Formularies").append(",")
@@ -558,7 +566,7 @@ class ReportController {
                             def totalQuantityAvailableToPromise = entry.value?.values()?.quantityAvailableToPromise?.sum()
                             def form = entry.key?.getProductCatalogs()?.collect {
                                 it.name
-                            }?.join(",")
+                            }?.join(",")  // FIXME
 
                             sw.append('"' + (entry.key?.productCode ?: "").toString()?.replace('"', '""') + '"').append(",")
                             sw.append('"' + (entry.key?.name ?: "").toString()?.replace('"', '""') + '"').append(",")

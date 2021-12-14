@@ -9,13 +9,12 @@
  **/
 package org.pih.warehouse.core
 
-import org.grails.plugins.csv.CSVWriter
+import org.pih.warehouse.importer.CSVUtils
 import org.pih.warehouse.inventory.InventoryItem
 import org.pih.warehouse.inventory.InventoryLevel
 import org.pih.warehouse.inventory.InventoryStatus
 import org.pih.warehouse.inventory.TransactionCode
 import org.pih.warehouse.inventory.TransactionEntry
-import org.pih.warehouse.product.Category
 import org.pih.warehouse.requisition.RequisitionItem
 
 import java.text.SimpleDateFormat
@@ -323,29 +322,28 @@ class DashboardService {
             inventoryLevelMap[inventoryLevel.product] = inventoryLevel
         }
 
-
-        def csvWriter = new CSVWriter(sw, {
-            "Product Code" { it.productCode }
-            "Name" { it.name }
-            "ABC" { it.abcClass }
-            "Most Recent Stock Count" { it.latestInventoryDate }
-            "QoH" { it.quantityOnHand }
-            "Unit of Measure" { it.unitOfMeasure }
-        })
+        def csv = CSVUtils.getCSVPrinter()
+        csv.printRecord(
+            "Product Code",
+            "Name",
+            "ABC",
+            "Most Recent Stock Count",
+            "QoH",
+            "Unit of Measure"
+        )
 
         products.each { product ->
             def latestInventoryDate = latestInventoryDateMap[product.id]
-            def row = [
-                    productCode        : product.productCode ?: "",
-                    name               : product.name,
-                    unitOfMeasure      : product.unitOfMeasure ?: "",
-                    abcClass           : inventoryLevelMap[product]?.abcClass ?: "",
-                    latestInventoryDate: latestInventoryDate ? "${formatDate.format(latestInventoryDate)}" : "",
-                    quantityOnHand     : quantityMap[product] ?: ""
-            ]
-            csvWriter << row
+            csv.printRecord(
+                    product?.productCode,
+                    product?.name,
+                    inventoryLevelMap[product]?.abcClass,
+                    latestInventoryDate ? "${formatDate.format(latestInventoryDate)}" : "",
+                    quantityMap[product],
+                    product?.unitOfMeasure
+            )
         }
-        return sw.toString()
+        return csv.out.toString()
     }
 
 
