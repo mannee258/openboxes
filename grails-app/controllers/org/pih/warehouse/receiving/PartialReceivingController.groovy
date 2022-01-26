@@ -1,6 +1,6 @@
 package org.pih.warehouse.receiving
 
-import org.pih.warehouse.api.StockMovement
+import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.shipping.Shipment
 

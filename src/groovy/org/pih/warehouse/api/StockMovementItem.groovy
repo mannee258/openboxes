@@ -11,6 +11,7 @@ import org.pih.warehouse.picklist.PicklistItem
 import org.pih.warehouse.product.Product
 import org.pih.warehouse.requisition.RequisitionItem
 import org.pih.warehouse.shipping.ShipmentItem
+import org.pih.warehouse.stockMovement.StockMovement
 
 class StockMovementItem {
 

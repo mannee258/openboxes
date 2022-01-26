@@ -12,7 +12,7 @@ package org.pih.warehouse.inventory
 import grails.validation.ValidationException
 import org.hibernate.ObjectNotFoundException
 import org.junit.Test
-import org.pih.warehouse.api.StockMovement
+import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.core.Person
 import org.pih.warehouse.product.Product
@@ -21,8 +21,6 @@ import org.pih.warehouse.requisition.Requisition
 import org.pih.warehouse.requisition.RequisitionItem
 import org.pih.warehouse.requisition.RequisitionStatus
 import org.pih.warehouse.requisition.RequisitionType
-
-import static org.junit.Assert.assertNotNull
 
 class StockMovementServiceTests extends GroovyTestCase {
 

@@ -9,7 +9,7 @@
  **/
 package org.pih.warehouse.inventory
 
-import grails.orm.PagedResultList
+
 import grails.validation.ValidationException
 import org.codehaus.groovy.grails.web.json.JSONObject
 import org.hibernate.ObjectNotFoundException
@@ -18,9 +18,7 @@ import org.pih.warehouse.api.AvailableItemStatus
 import org.pih.warehouse.api.DocumentGroupCode
 import org.pih.warehouse.api.PackPageItem
 import org.pih.warehouse.api.PickPageItem
-import org.pih.warehouse.api.StockMovement
 import org.pih.warehouse.api.StockMovementItem
-import org.pih.warehouse.api.StockMovementType
 import org.pih.warehouse.api.SubstitutionItem
 import org.pih.warehouse.api.SuggestedItem
 import org.pih.warehouse.auth.AuthService
@@ -57,6 +55,7 @@ import org.pih.warehouse.shipping.ShipmentItem
 import org.pih.warehouse.shipping.ShipmentStatusCode
 import org.pih.warehouse.shipping.ShipmentType
 import org.pih.warehouse.shipping.ShipmentWorkflow
+import org.pih.warehouse.stockMovement.StockMovement
 
 class StockMovementService {
 
@@ -356,93 +355,23 @@ class StockMovementService {
         }
     }
 
-    def getStockMovements(StockMovement criteria, Map params) {
+    def getStockMovements(Integer maxResults, Integer offset) {
+        return getStockMovements(new StockMovement(), [max:maxResults, offset:offset])
+    }
+
+    def getStockMovements(StockMovement stockMovement, Map params) {
         params.includeStockMovementItems = false
-        switch(criteria.stockMovementType) {
-            case StockMovementType.OUTBOUND:
-                return getOutboundStockMovements(criteria, params)
-            case StockMovementType.INBOUND:
-                return getInboundStockMovements(criteria, params)
-            default:
-                throw new IllegalArgumentException("Origin and destination cannot be the same")
-        }
-    }
 
-
-    def getInboundStockMovements(Integer maxResults, Integer offset) {
-        return getInboundStockMovements(new StockMovement(), [:], maxResults, offset)
-    }
-
-    def getInboundStockMovements(StockMovement criteria, Map params) {
-        def shipments = Shipment.createCriteria().list(max: params.max, offset: params.offset) {
-
-            if (criteria?.identifier || criteria.name || criteria?.description) {
-                or {
-                    if (criteria?.identifier) {
-                        ilike("shipmentNumber", criteria.identifier)
-                    }
-                    if (criteria?.name) {
-                        ilike("name", criteria.name)
-                    }
-                    if (criteria?.description) {
-                        ilike("description", criteria.description)
-                    }
-                }
-            }
-            if (criteria.destination) eq("destination", criteria.destination)
-            if (criteria.origin) eq("origin", criteria.origin)
-            if (criteria.receiptStatusCodes) 'in'("currentStatus", criteria.receiptStatusCodes)
-            if (criteria.createdBy) {
-                eq("createdBy", criteria?.createdBy)
-            }
-            if (criteria.requestedBy) {
-                requisition {
-                    eq("requestedBy", criteria?.requestedBy)
-                }
-            }
-            if (criteria.updatedBy) {
-                eq("updatedBy", criteria.updatedBy)
-            }
-            if(params.createdAfter) {
-                ge("dateCreated", params.createdAfter)
-            }
-            if(params.createdBefore) {
-                le("dateCreated", params.createdBefore)
-            }
-
-            order("dateCreated", "desc")
-        }
-        def stockMovements = shipments.collect { Shipment shipment ->
-            if (shipment.requisition) {
-                return StockMovement.createFromRequisition(shipment.requisition, params.includeStockMovementItems)
-            }
-            else {
-                return StockMovement.createFromShipment(shipment, params.includeStockMovementItems)
-            }
-        }
-        return new PagedResultList(stockMovements, shipments.totalCount)
-    }
-
-    def getOutboundStockMovements(Integer maxResults, Integer offset) {
-        return getOutboundStockMovements(new StockMovement(), [maxResults:maxResults, offset:offset])
-    }
-
-    def getOutboundStockMovements(StockMovement stockMovement, Map params) {
-        log.info "Stock movement: ${stockMovement?.currentStatus}"
-
-        def requisitions = Requisition.createCriteria().list(max: params.max, offset: params.offset) {
-            eq("isTemplate", Boolean.FALSE)
+        def stockMovements = StockMovement.createCriteria().list(max: params.max, offset: params.offset) {
 
             if (stockMovement?.receiptStatusCodes) {
-                shipments {
-                    'in'("currentStatus", stockMovement.receiptStatusCodes)
-                }
+                'in'("shipmentStatus", stockMovement.receiptStatusCodes)
             }
 
             if (stockMovement?.identifier || stockMovement.name || stockMovement?.description) {
                 or {
                     if (stockMovement?.identifier) {
-                        ilike("requestNumber", stockMovement.identifier)
+                        ilike("identifier", stockMovement.identifier)
                     }
                     if (stockMovement?.name) {
                         ilike("name", stockMovement.name)
@@ -473,6 +402,9 @@ class StockMovementService {
             if (stockMovement.requisitionStatusCodes) {
                 'in'("status", stockMovement.requisitionStatusCodes)
             }
+            if (stockMovement.receiptStatusCodes) {
+                'in'("shipmentStatus", stockMovement.receiptStatusCodes)
+            }
             if (stockMovement.requestedBy) {
                 eq("requestedBy", stockMovement.requestedBy)
             }
@@ -483,7 +415,7 @@ class StockMovementService {
                 eq("updatedBy", stockMovement.updatedBy)
             }
             if (stockMovement.requestType) {
-                eq("type", stockMovement.requestType)
+                eq("requestType", stockMovement.requestType)
             }
             if (stockMovement.sourceType) {
                 eq ('sourceType', stockMovement.sourceType)
@@ -507,27 +439,26 @@ class StockMovementService {
             }
         }
 
-        def stockMovements = requisitions.collect { requisition ->
-            return StockMovement.createFromRequisition(requisition, params.includeStockMovementItems)
+        if (params.includeStockMovementItems) {
+            stockMovements.each { item ->
+                item.createLineItems()
+            }
         }
 
-        return new PagedResultList(stockMovements, requisitions.totalCount)
+        return stockMovements
     }
-
 
     StockMovement getStockMovement(String id) {
-        return getStockMovement(id, (String) null)
-    }
+        StockMovement stockMovement = StockMovement.get(id)
 
-    StockMovement getStockMovement(String id, String stepNumber) {
-        Requisition requisition = Requisition.get(id)
-        if (requisition) {
-            return getRequisitionBasedStockMovement(requisition, stepNumber)
+        if (stockMovement) {
+            stockMovement.createLineItems()
+            return stockMovement
         } else {
             Shipment shipment = Shipment.get(id)
             if (shipment?.requisition) {
                 log.info "Shipment.requisition ${shipment.requisition}"
-                return getRequisitionBasedStockMovement(shipment.requisition, stepNumber)
+                return getRequisitionBasedStockMovement(shipment.requisition)
             }
             else if (shipment) {
                 log.info "Shipment ${shipment}"
@@ -545,7 +476,7 @@ class StockMovementService {
         return stockMovement
     }
 
-    StockMovement getRequisitionBasedStockMovement(Requisition requisition, String stepNumber) {
+    StockMovement getRequisitionBasedStockMovement(Requisition requisition) {
         StockMovement stockMovement = StockMovement.createFromRequisition(requisition)
         stockMovement.documents = getDocuments(stockMovement)
         return stockMovement
@@ -2121,11 +2052,11 @@ class StockMovementService {
             throw new IllegalArgumentException("Could not find shipment for stock movement with ID ${stockMovement.id}")
         }
 
-        if (stockMovement.statusCode == StockMovementStatusCode.DISPATCHED.toString()) {
+        if (stockMovement.statusCode == StockMovementStatusCode.DISPATCHED) {
             String inventoryLocationName = locationService.getReceivingLocationName(stockMovement.identifier)
             Location inventoryLocation = locationService.findInternalLocation(shipment.destination, inventoryLocationName)
             if (inventoryLocation != null) {
-                if (stockMovement.currentStatus == ShipmentStatusCode.PARTIALLY_RECEIVED.toString()) {
+                if (stockMovement.shipmentStatus == ShipmentStatusCode.PARTIALLY_RECEIVED) {
                     throw new IllegalArgumentException("You can not change destination if shipment is partially received!")
                 }
                 if (stockMovement.destination.organization == null) {
@@ -2161,11 +2092,11 @@ class StockMovementService {
             throw new IllegalArgumentException("Could not find shipment for stock movement with ID ${stockMovement.id}")
         }
 
-        if (stockMovement.statusCode == StockMovementStatusCode.DISPATCHED.toString()) {
+        if (stockMovement.statusCode == StockMovementStatusCode.DISPATCHED) {
             String inventoryLocationName = locationService.getReceivingLocationName(stockMovement.identifier)
             Location inventoryLocation = locationService.findInternalLocation(shipment.destination, inventoryLocationName)
             if (inventoryLocation != null) {
-                if (stockMovement.currentStatus == ShipmentStatusCode.PARTIALLY_RECEIVED.toString()) {
+                if (stockMovement.shipmentStatus == ShipmentStatusCode.PARTIALLY_RECEIVED) {
                     throw new IllegalArgumentException("You can not change destination if shipment is partially received!")
                 }
                 if (stockMovement.destination.organization == null) {

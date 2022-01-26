@@ -25,6 +25,7 @@ import org.pih.warehouse.requisition.Requisition
 import org.pih.warehouse.requisition.RequisitionItem
 import org.pih.warehouse.requisition.RequisitionSourceType
 import org.pih.warehouse.shipping.Shipment
+import org.pih.warehouse.stockMovement.StockMovement
 
 class StockMovementApiController {
 
@@ -34,9 +35,7 @@ class StockMovementApiController {
     def list = {
         int max = Math.min(params.max ? params.int('max') : 10, 1000)
         int offset = params.offset ? params.int("offset") : 0
-        def stockMovements = params.direction == "INBOUND" ?
-                stockMovementService.getInboundStockMovements(max, offset) :
-                stockMovementService.getOutboundStockMovements(max, offset)
+        def stockMovements = stockMovementService.getStockMovements(max, offset)
 
         stockMovements = stockMovements.collect { StockMovement stockMovement ->
             Map json = stockMovement.toJson()
@@ -77,11 +76,7 @@ class StockMovementApiController {
     def create = { StockMovement stockMovement ->
         // Detect whether inbound or outbound stock movement
         def currentLocation = Location.get(session.warehouse.id)
-        StockMovementType stockMovementType = stockMovement.origin.equals(currentLocation) ?
-                StockMovementType.OUTBOUND : stockMovement.destination.equals(currentLocation) ?
-                        StockMovementType.INBOUND : null
 
-        stockMovement.stockMovementType = stockMovementType
         stockMovement.requestType = params.requestType
         stockMovement.sourceType = params.sourceType as RequisitionSourceType
         StockMovement newStockMovement = stockMovementService.createStockMovement(stockMovement)

@@ -21,7 +21,7 @@ import org.pih.warehouse.api.PartialReceiptContainer
 import org.pih.warehouse.api.PartialReceiptItem
 import org.pih.warehouse.api.PickPageItem
 import org.pih.warehouse.api.StockAdjustment
-import org.pih.warehouse.api.StockMovement
+import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.api.StockMovementItem
 import org.pih.warehouse.api.Stocklist
 import org.pih.warehouse.api.StocklistItem

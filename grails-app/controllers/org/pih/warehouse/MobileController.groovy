@@ -9,16 +9,15 @@
 **/
 package org.pih.warehouse
 
-import org.pih.warehouse.api.StockMovement
-import org.pih.warehouse.api.StockMovementType
+
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.core.User
-import org.pih.warehouse.inventory.StockMovementStatusCode
 import org.pih.warehouse.order.Order
 import org.pih.warehouse.order.OrderTypeCode
 import org.pih.warehouse.product.Product
 import org.pih.warehouse.product.ProductSummary
 import org.pih.warehouse.requisition.Requisition
+import org.pih.warehouse.stockMovement.StockMovement
 
 class MobileController {
 
@@ -99,7 +98,7 @@ class MobileController {
 
     def outboundList = {
         Location origin = Location.get(params.origin?params.origin.id:session.warehouse.id)
-        StockMovement stockMovement = new StockMovement(origin: origin, stockMovementType: StockMovementType.OUTBOUND, stockMovementStatusCode: StockMovementStatusCode.PENDING)
+        StockMovement stockMovement = new StockMovement(origin: origin)
         def stockMovements = stockMovementService.getStockMovements(stockMovement, [max:params.max?:10, offset: params.offset?:0])
         [stockMovements:stockMovements]
     }

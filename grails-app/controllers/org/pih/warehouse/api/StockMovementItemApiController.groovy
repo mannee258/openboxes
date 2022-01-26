@@ -14,6 +14,7 @@ import org.codehaus.groovy.grails.web.json.JSONObject
 import org.hibernate.ObjectNotFoundException
 import org.pih.warehouse.core.Location
 import org.pih.warehouse.requisition.RequisitionItem
+import org.pih.warehouse.stockMovement.StockMovement
 
 class StockMovementItemApiController {
 

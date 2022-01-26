@@ -27,6 +27,7 @@ enum StockMovementStatusCode {
     PACKED(7, PENDING),
     REVIEWING(8, PENDING),
     DISPATCHED(9),
+    ISSUED(9),
     CANCELED(10)
 
     int sortOrder

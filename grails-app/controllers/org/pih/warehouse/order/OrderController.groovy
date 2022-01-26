@@ -12,7 +12,7 @@ package org.pih.warehouse.order
 import fr.opensagres.xdocreport.converter.ConverterTypeTo
 import grails.converters.JSON
 import grails.validation.ValidationException
-import org.pih.warehouse.api.StockMovement
+import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.core.ActivityCode
 import org.pih.warehouse.core.BudgetCode
 import org.pih.warehouse.core.Comment

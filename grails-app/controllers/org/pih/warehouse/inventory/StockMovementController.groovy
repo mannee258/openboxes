@@ -12,9 +12,9 @@ package org.pih.warehouse.inventory
 
 import grails.converters.JSON
 import org.grails.plugins.csv.CSVWriter
-import org.pih.warehouse.api.StockMovement
+import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.api.StockMovementItem
-import org.pih.warehouse.api.StockMovementType
+import org.pih.warehouse.api.StockMovementDirection
 import org.pih.warehouse.core.ActivityCode
 import org.pih.warehouse.core.BulkDocumentCommand
 import org.pih.warehouse.core.Constants
@@ -22,7 +22,6 @@ import org.pih.warehouse.core.Document
 import org.pih.warehouse.core.DocumentCommand
 import org.pih.warehouse.core.DocumentType
 import org.pih.warehouse.core.Location
-import org.pih.warehouse.core.User
 import org.pih.warehouse.importer.ImportDataCommand
 import org.pih.warehouse.order.OrderTypeCode
 import org.pih.warehouse.picklist.PicklistItem
@@ -44,8 +43,8 @@ class StockMovementController {
     }
 
     def create = {
-        StockMovementType stockMovementType = params.direction as StockMovementType
-        if (stockMovementType == StockMovementType.INBOUND) {
+        StockMovementDirection stockMovementDirection = params.direction as StockMovementDirection
+        if (stockMovementDirection == StockMovementDirection.INBOUND) {
             redirect(action: "createInbound")
         }
         else {
@@ -83,14 +82,14 @@ class StockMovementController {
             return
         }
 
-        StockMovementType stockMovementType = currentLocation == stockMovement.origin ?
-                StockMovementType.OUTBOUND : currentLocation == stockMovement.destination || stockMovement?.origin?.isSupplier() ?
-                        StockMovementType.INBOUND : null
+        StockMovementDirection stockMovementDirection = currentLocation == stockMovement.origin ?
+                StockMovementDirection.OUTBOUND : currentLocation == stockMovement.destination || stockMovement?.origin?.isSupplier() ?
+                        StockMovementDirection.INBOUND : null
 
-        if (stockMovementType == StockMovementType.OUTBOUND && stockMovement.requisition.sourceType == RequisitionSourceType.ELECTRONIC) {
+        if (stockMovementDirection == StockMovementDirection.OUTBOUND && stockMovement.requisition.sourceType == RequisitionSourceType.ELECTRONIC) {
             redirect(action: "verifyRequest", params: params)
         }
-        else if (stockMovementType == StockMovementType.INBOUND) {
+        else if (stockMovementDirection == StockMovementDirection.INBOUND) {
             if (stockMovement.isFromOrder) {
                 redirect(action: "createCombinedShipments", params: params)
             } else if (stockMovement.requisition?.sourceType == RequisitionSourceType.ELECTRONIC) {
@@ -124,25 +123,25 @@ class StockMovementController {
         Date createdBefore = params.createdBefore ? Date.parse("MM/dd/yyyy", params.createdBefore) : null
         Location currentLocation = Location.get(session?.warehouse?.id)
 
-        StockMovementType stockMovementType = params.direction ? params.direction as StockMovementType : null
+        StockMovementDirection stockMovementDirection = params.direction ? params.direction as StockMovementDirection : null
         // On initial request we set the origin and destination based on the direction
-        if (stockMovementType == StockMovementType.OUTBOUND) {
+        if (stockMovementDirection == StockMovementDirection.OUTBOUND) {
             params.origin = params.origin ?: currentLocation
             params.destination = params.destination ?: null
-        } else if (stockMovementType == StockMovementType.INBOUND) {
+        } else if (stockMovementDirection == StockMovementDirection.INBOUND) {
             params.origin = params.origin ?: null
             params.destination = params.destination ?: currentLocation
         } else {
             // This is necessary because sometimes we need to infer the direction from the parameters
             if (params.origin?.id == currentLocation?.id && params.destination?.id == currentLocation?.id) {
-                stockMovementType = null
+                stockMovementDirection = null
                 params.direction = null
             } else if (params.origin?.id == currentLocation?.id) {
-                stockMovementType = StockMovementType.OUTBOUND
-                params.direction = stockMovementType.toString()
+                stockMovementDirection = StockMovementDirection.OUTBOUND
+                params.direction = stockMovementDirection.toString()
             } else if (params.destination?.id == currentLocation?.id) {
-                stockMovementType = StockMovementType.INBOUND
-                params.direction = stockMovementType.toString()
+                stockMovementDirection = StockMovementDirection.INBOUND
+                params.direction = stockMovementDirection.toString()
             } else {
                 params.origin = params.origin ?: currentLocation
                 params.destination = params.destination ?: currentLocation
@@ -166,7 +165,6 @@ class StockMovementController {
             stockMovement.description = "%" + params.q + "%"
         }
 
-        stockMovement.stockMovementType = stockMovementType
         stockMovement.requestedBy = requisition.requestedBy
         stockMovement.createdBy = requisition.createdBy
         stockMovement.origin = requisition.origin
@@ -317,8 +315,8 @@ class StockMovementController {
             }
         }
         // We need to set the correct parameter so stock movement list is displayed properly
-        params.direction = (currentLocation == stockMovement.origin) ? StockMovementType.OUTBOUND :
-                (currentLocation == stockMovement.destination) ? StockMovementType.INBOUND : "ALL"
+        params.direction = (currentLocation == stockMovement.origin) ? StockMovementDirection.OUTBOUND :
+                (currentLocation == stockMovement.destination) ? StockMovementDirection.INBOUND : "ALL"
 
         if (isCentralPurchasingEnabled) {
             redirect(controller: 'order', action: "list", params: [orderTypeCode: OrderTypeCode.PURCHASE_ORDER])
