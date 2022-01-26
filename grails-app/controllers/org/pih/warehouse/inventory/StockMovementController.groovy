@@ -12,6 +12,7 @@ package org.pih.warehouse.inventory
 
 import grails.converters.JSON
 import org.grails.plugins.csv.CSVWriter
+import org.pih.warehouse.api.StockMovementType
 import org.pih.warehouse.stockMovement.StockMovement
 import org.pih.warehouse.api.StockMovementItem
 import org.pih.warehouse.api.StockMovementDirection
@@ -112,7 +113,12 @@ class StockMovementController {
 
     def show = {
         StockMovement stockMovement = stockMovementService.getStockMovement(params.id)
-        [stockMovement: stockMovement]
+
+        if (StockMovementType.RETURN_ORDER == stockMovement.stockMovementType) {
+            render(view: "showReturn", model: [stockMovement: stockMovement])
+        } else {
+            render(view: "show", model: [stockMovement: stockMovement])
+        }
     }
 
     def list = {
